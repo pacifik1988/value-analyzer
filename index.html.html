@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Value Analyzer" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0d0d1a" />
+  <title>Munger & Buffett – Value Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Space Mono', monospace;
+      background: #0d0d1a;
+      background-image: radial-gradient(ellipse at 20% 20%, #1a1a3e 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, #1a0d0d 0%, transparent 50%);
+      color: #d4c5a9;
+      min-height: 100vh;
+      padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 16px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 16px);
+      padding-top: max(env(safe-area-inset-top), 20px);
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: #0d0d1a; }
+    ::-webkit-scrollbar-thumb { background: #3a3a5c; border-radius: 2px; }
+
+    .container { max-width: 780px; margin: 0 auto; }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 28px; padding-top: 8px; }
+    .header-eyebrow { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; }
+    .header-line { height: 1px; width: 36px; background: #e2c97e44; }
+    .header-tag { color: #e2c97e; font-size: 9px; letter-spacing: 4px; }
+    .header h1 { font-family: 'Playfair Display', serif; font-size: clamp(26px, 6vw, 46px); color: #e2c97e; font-weight: 900; line-height: 1.1; }
+    .header p { color: #8a7a66; font-size: 10px; margin-top: 6px; letter-spacing: 1px; }
+
+    /* Search */
+    .search-wrap { position: relative; margin-bottom: 16px; }
+    .search-row { display: flex; gap: 8px; }
+    .search-input {
+      flex: 1; padding: 14px 16px;
+      background: #0f0f22; border: 1px solid #2a2a4a;
+      border-radius: 10px; color: #e2c97e;
+      font-size: 13px; font-family: 'Space Mono', monospace;
+      outline: none; transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    .search-input:focus { border-color: #e2c97e55; }
+    .search-input::placeholder { color: #4a3a2e; }
+    .analyze-btn {
+      padding: 14px 18px; background: #e2c97e; color: #0d0d1a;
+      border: none; border-radius: 10px; font-family: 'Space Mono', monospace;
+      font-size: 10px; font-weight: 700; cursor: pointer;
+      letter-spacing: 1px; transition: all 0.2s; white-space: nowrap;
+      -webkit-appearance: none;
+    }
+    .analyze-btn:active { transform: scale(0.97); background: #c9b06e; }
+    .analyze-btn:disabled { background: #4a3a1e; color: #8a7a66; cursor: not-allowed; }
+
+    /* Dropdown */
+    .dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: #0f0f22; border: 1px solid #2a2a4a; border-radius: 10px;
+      max-height: 200px; overflow-y: auto; display: none;
+    }
+    .dropdown.open { display: block; }
+    .dropdown-item { padding: 11px 16px; color: #d4c5a9; font-size: 12px; cursor: pointer; }
+    .dropdown-item:active { background: #1a1a3e; }
+
+    /* Chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 28px; }
+    .chip {
+      padding: 7px 13px; background: #0f0f22; border: 1px solid #2a2a4a;
+      border-radius: 20px; color: #8a7a66; font-size: 10px; cursor: pointer;
+      font-family: 'Space Mono', monospace; transition: all 0.2s;
+    }
+    .chip:active { background: #1a1a3e; border-color: #e2c97e; color: #e2c97e; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 60px 20px; display: none; }
+    .loading.show { display: block; }
+    .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+    .dot {
+      width: 8px; height: 8px; background: #e2c97e; border-radius: 50%;
+      animation: pulse 1.2s ease infinite;
+    }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .loading-title { color: #8a7a66; font-size: 11px; letter-spacing: 2px; }
+    .loading-sub { color: #4a3a2e; font-size: 10px; margin-top: 6px; }
+
+    /* Empty */
+    .empty { text-align: center; padding: 50px 20px; border-top: 1px solid #1a1a2e; }
+    .empty-icon { font-size: 44px; margin-bottom: 14px; }
+    .empty p { color: #4a3a2e; font-size: 10px; line-height: 2.2; letter-spacing: 1px; }
+
+    /* Error */
+    .error-box { background: #1a0f0f; border: 1px solid #ef444433; border-radius: 12px; padding: 24px; text-align: center; display: none; }
+    .error-box.show { display: block; }
+    .error-box p { color: #ef4444; font-size: 12px; }
+
+    /* Results */
+    .results { display: none; }
+    .results.show { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Header card */
+    .result-header {
+      background: linear-gradient(135deg, #0f0f22 0%, #14141f 100%);
+      border: 1px solid #2a2a4a; border-radius: 14px; padding: 22px;
+      margin-bottom: 14px; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
+    }
+    .result-meta { flex: 1; min-width: 160px; }
+    .result-sector { color: #8a7a66; font-size: 9px; letter-spacing: 2px; margin-bottom: 5px; }
+    .result-name { font-family: 'Playfair Display', serif; color: #e2c97e; font-size: clamp(18px,4vw,28px); font-weight: 700; margin-bottom: 3px; }
+    .result-ticker { color: #4a7a8a; font-size: 11px; margin-bottom: 14px; }
+    .result-verdict { color: #d4c5a9; font-size: 11px; line-height: 1.7; font-style: italic; border-left: 2px solid #e2c97e33; padding-left: 12px; }
+
+    /* Gauge */
+    .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .gauge-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; }
+
+    /* 2-col grid */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    @media (max-width: 400px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* Strength / Risk cards */
+    .strength-card { background: #0a1a0a; border: 1px solid #22c55e22; border-radius: 12px; padding: 16px; }
+    .risk-card { background: #1a0a0a; border: 1px solid #ef444422; border-radius: 12px; padding: 16px; }
+    .card-title { font-size: 9px; letter-spacing: 2px; margin-bottom: 12px; font-weight: 700; }
+    .strength-card .card-title { color: #22c55e; }
+    .risk-card .card-title { color: #ef4444; }
+    .card-item { display: flex; gap: 8px; margin-bottom: 8px; }
+    .card-arrow { font-size: 10px; margin-top: 1px; flex-shrink: 0; }
+    .strength-card .card-arrow { color: #22c55e; }
+    .risk-card .card-arrow { color: #ef4444; }
+    .card-text { font-size: 10px; line-height: 1.6; }
+
+    /* Criteria */
+    .criteria-card { background: #0f0f22; border: 1px solid #2a2a4a; border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+    .criteria-title { color: #e2c97e; font-size: 9px; letter-spacing: 2px; margin-bottom: 18px; }
+    .criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+    @media (max-width: 420px) { .criteria-grid { grid-template-columns: 1fr; } }
+    .criterion { margin-bottom: 14px; }
+    .criterion-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .criterion-left { display: flex; align-items: center; gap: 7px; }
+    .criterion-icon { font-size: 14px; }
+    .criterion-label { color: #d4c5a9; font-size: 10px; }
+    .criterion-score { font-size: 10px; font-weight: 700; }
+    .criterion-bar-bg { height: 3px; background: #1a1a2e; border-radius: 2px; overflow: hidden; }
+    .criterion-bar { height: 100%; border-radius: 2px; transition: width 1s ease; }
+    .criterion-comment { color: #8a7a66; font-size: 9px; margin-top: 3px; line-height: 1.5; }
+
+    /* Quotes */
+    .quote-card { background: #0f0f22; border-radius: 12px; padding: 18px; }
+    .quote-author { font-size: 9px; letter-spacing: 1px; margin-bottom: 10px; }
+    .quote-text { color: #d4c5a9; font-size: 10px; line-height: 1.9; font-style: italic; }
+
+    /* Disclaimer */
+    .disclaimer { color: #3a3a5a; font-size: 8px; text-align: center; line-height: 2; margin-top: 8px; margin-bottom: 16px; }
+
+    /* Install banner */
+    .install-banner {
+      background: #0f0f1e; border: 1px solid #e2c97e22; border-radius: 10px;
+      padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center;
+      gap: 12px; display: none;
+    }
+    .install-banner.show { display: flex; }
+    .install-text { flex: 1; font-size: 10px; color: #8a7a66; line-height: 1.6; }
+    .install-btn {
+      padding: 8px 14px; background: #e2c97e22; border: 1px solid #e2c97e55;
+      border-radius: 8px; color: #e2c97e; font-size: 10px; font-family: 'Space Mono', monospace;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Install Banner (iOS hint) -->
+  <div class="install-banner" id="installBanner">
+    <div class="install-text">📱 Als App speichern: Teilen → „Zum Home-Bildschirm"</div>
+    <button class="install-btn" onclick="document.getElementById('installBanner').style.display='none'">✕</button>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-eyebrow">
+      <div class="header-line"></div>
+      <span class="header-tag">VALUE INVESTING ANALYSIS</span>
+      <div class="header-line"></div>
+    </div>
+    <h1>Munger &amp; Buffett</h1>
+    <p>KI-gestützte Aktienanalyse nach den Value-Legenden</p>
+  </div>
+
+  <!-- Search -->
+  <div class="search-wrap">
+    <div class="search-row">
+      <input id="searchInput" class="search-input" type="text" placeholder="Aktie eingeben, z.B. Apple…" autocomplete="off" autocorrect="off" spellcheck="false" />
+      <button class="analyze-btn" id="analyzeBtn" onclick="analyzeFromInput()">ANALYSE</button>
+    </div>
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+
+  <!-- Quick Chips -->
+  <div class="chips" id="chips"></div>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <p class="loading-title" id="loadingTitle">ANALYSIERE…</p>
+    <p class="loading-sub">Prüfe Burggraben, Management &amp; Bewertung</p>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"><p id="errorMsg"></p></div>
+
+  <!-- Empty State -->
+  <div class="empty" id="emptyState">
+    <div class="empty-icon">🔍</div>
+    <p>WÄHLE EINE AKTIE AUS<br>UND ENTDECKE OB SIE DEN<br>BUFFETT/MUNGER-TEST BESTEHT</p>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <!-- Header card -->
+    <div class="result-header">
+      <div class="result-meta">
+        <div class="result-sector" id="rSector"></div>
+        <div class="result-name" id="rName"></div>
+        <div class="result-ticker" id="rTicker"></div>
+        <div class="result-verdict" id="rVerdict"></div>
+      </div>
+      <div class="gauge-wrap">
+        <svg id="gauge" width="160" height="90" viewBox="0 0 180 100">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#ef4444" />
+              <stop offset="50%" stop-color="#f59e0b" />
+              <stop offset="100%" stop-color="#22c55e" />
+            </linearGradient>
+          </defs>
+          <path d="M 15 90 A 75 75 0 0 1 165 90" stroke="url(#gaugeGrad)" stroke-width="12" fill="none" stroke-linecap="round" />
+          <g id="gaugeNeedle">
+            <line x1="90" y1="90" x2="90" y2="25" stroke="#e2c97e" stroke-width="3" stroke-linecap="round" />
+            <circle cx="90" cy="90" r="6" fill="#e2c97e" />
+          </g>
+          <text id="gaugeScore" x="90" y="78" text-anchor="middle" fill="#e2c97e" font-size="22" font-family="'Playfair Display', serif" font-weight="700">0</text>
+        </svg>
+        <span class="gauge-label" id="gaugeLabel"></span>
+      </div>
+    </div>
+
+    <!-- Strengths & Risks -->
+    <div class="two-col">
+      <div class="strength-card">
+        <div class="card-title">✓ STÄRKEN</div>
+        <div id="strengthsList"></div>
+      </div>
+      <div class="risk-card">
+        <div class="card-title">⚠ RISIKEN</div>
+        <div id="risksList"></div>
+      </div>
+    </div>
+
+    <!-- Criteria -->
+    <div class="criteria-card">
+      <div class="criteria-title">📊 KRITERIENANALYSE</div>
+      <div class="criteria-grid" id="criteriaGrid"></div>
+    </div>
+
+    <!-- Quotes -->
+    <div class="two-col">
+      <div class="quote-card" style="border:1px solid #8b735533;">
+        <div class="quote-author" style="color:#8b7355;">— CHARLIE MUNGER</div>
+        <div class="quote-text" id="mungerQuote"></div>
+      </div>
+      <div class="quote-card" style="border:1px solid #4a7a8a33;">
+        <div class="quote-author" style="color:#4a7a8a;">— WARREN BUFFETT</div>
+        <div class="quote-text" id="buffettQuote"></div>
+      </div>
+    </div>
+
+    <p class="disclaimer">⚠ KI-generiert · Nur zu Bildungszwecken · Keine Anlageberatung</p>
+  </div>
+
+</div>
+
+<script>
+const POPULAR_STOCKS = [
+  "Apple (AAPL)", "Microsoft (MSFT)", "Coca-Cola (KO)", "American Express (AXP)",
+  "Berkshire Hathaway (BRK.B)", "Amazon (AMZN)", "Alphabet (GOOGL)", "Johnson & Johnson (JNJ)",
+  "Visa (V)", "Mastercard (MA)", "LVMH (MC.PA)", "Nestlé (NESN.SW)",
+  "SAP (SAP)", "Allianz (ALV.DE)", "Siemens (SIE.DE)", "Ferrari (RACE)",
+  "Novo Nordisk (NVO)", "ASML (ASML)", "Tesla (TSLA)", "Meta (META)"
+];
+
+const CRITERIA_DEFS = [
+  { key: "moat", label: "Wirtschaftl. Burggraben", icon: "🏰" },
+  { key: "management", label: "Management-Qualität", icon: "👔" },
+  { key: "earnings", label: "Gewinnstabilität", icon: "📈" },
+  { key: "roe", label: "Eigenkapitalrendite", icon: "💰" },
+  { key: "debt", label: "Verschuldung", icon: "⚖️" },
+  { key: "price", label: "Faire Bewertung", icon: "🎯" },
+  { key: "simplicity", label: "Geschäftsmodell", icon: "🔍" },
+  { key: "longevity", label: "Langfr. Perspektive", icon: "🌳" },
+];
+
+// Build chips
+const chipsEl = document.getElementById('chips');
+["Coca-Cola (KO)", "Apple (AAPL)", "Nestlé (NESN.SW)", "LVMH (MC.PA)", "Visa (V)", "ASML (ASML)"].forEach(s => {
+  const b = document.createElement('button');
+  b.className = 'chip';
+  b.textContent = s;
+  b.onclick = () => selectStock(s);
+  chipsEl.appendChild(b);
+});
+
+// Search / dropdown
+const input = document.getElementById('searchInput');
+const dropdown = document.getElementById('dropdown');
+
+input.addEventListener('input', () => {
+  const q = input.value.toLowerCase();
+  const matches = POPULAR_STOCKS.filter(s => s.toLowerCase().includes(q));
+  dropdown.innerHTML = '';
+  if (q && matches.length) {
+    matches.forEach(s => {
+      const d = document.createElement('div');
+      d.className = 'dropdown-item';
+      d.textContent = s;
+      d.addEventListener('mousedown', () => selectStock(s));
+      d.addEventListener('touchstart', () => selectStock(s), { passive: true });
+      dropdown.appendChild(d);
+    });
+    dropdown.classList.add('open');
+  } else {
+    dropdown.classList.remove('open');
+  }
+});
+input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 200));
+input.addEventListener('keydown', e => { if (e.key === 'Enter') analyzeFromInput(); });
+
+function selectStock(s) {
+  input.value = s;
+  dropdown.classList.remove('open');
+  analyze(s);
+}
+function analyzeFromInput() { if (input.value.trim()) analyze(input.value.trim()); }
+
+// Show iOS install hint once
+if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone) {
+  document.getElementById('installBanner').classList.add('show');
+}
+
+// Gauge helper
+function setGauge(score) {
+  const angle = (score / 100) * 180 - 90;
+  document.getElementById('gaugeNeedle').setAttribute('transform', `rotate(${angle}, 90, 90)`);
+  document.getElementById('gaugeScore').textContent = score;
+  const color = score >= 70 ? '#22c55e' : score >= 45 ? '#f59e0b' : '#ef4444';
+  const label = score >= 70 ? 'KAUFENSWERT' : score >= 45 ? 'BEOBACHTEN' : 'MEIDEN';
+  const lEl = document.getElementById('gaugeLabel');
+  lEl.textContent = label;
+  lEl.style.color = color;
+}
+
+function scoreColor(s) { return s >= 70 ? '#22c55e' : s >= 45 ? '#f59e0b' : '#ef4444'; }
+
+function show(id) { document.getElementById(id).classList.add('show'); }
+function hide(id) { document.getElementById(id).classList.remove('show'); }
+function hideAll() {
+  ['loading','errorBox','results'].forEach(hide);
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+async function analyze(stockName) {
+  hideAll();
+  show('loading');
+  document.getElementById('loadingTitle').textContent = 'ANALYSIERE ' + stockName.toUpperCase() + '…';
+  document.getElementById('analyzeBtn').disabled = true;
+
+  const prompt = `Du bist ein Experte für Value Investing nach Charlie Munger und Warren Buffett. Analysiere die Aktie: "${stockName}"
+
+Bewerte diese 8 Kriterien mit einem Score von 0–100 und einem kurzen Kommentar (max 12 Wörter). Antworte NUR mit einem gültigen JSON-Objekt, keine anderen Texte, kein Markdown:
+
+{
+  "companyName": "Offizieller Unternehmensname",
+  "ticker": "Börsenkürzel",
+  "sector": "Sektor",
+  "overallScore": Zahl,
+  "verdict": "Ein Satz Fazit nach Munger/Buffett-Stil",
+  "mungerQuote": "Erfundenes passendes Zitat im Stil von Munger zu dieser Aktie",
+  "buffettQuote": "Erfundenes passendes Zitat im Stil von Buffett zu dieser Aktie",
+  "criteria": {
+    "moat": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "management": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "earnings": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "roe": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "debt": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "price": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "simplicity": { "score": Zahl, "comment": "Kurzer Kommentar" },
+    "longevity": { "score": Zahl, "comment": "Kurzer Kommentar" }
+  },
+  "watchPoints": ["Risikopunkt 1", "Risikopunkt 2", "Risikopunkt 3"],
+  "strengths": ["Stärke 1", "Stärke 2", "Stärke 3"]
+}`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content.map(i => i.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const d = JSON.parse(clean);
+    renderResults(d);
+  } catch(e) {
+    hide('loading');
+    document.getElementById('errorMsg').textContent = 'Analyse fehlgeschlagen. Bitte erneut versuchen.';
+    show('errorBox');
+  } finally {
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+
+function renderResults(d) {
+  hide('loading');
+
+  // Header
+  document.getElementById('rSector').textContent = d.sector || '';
+  document.getElementById('rName').textContent = d.companyName || '';
+  document.getElementById('rTicker').textContent = d.ticker || '';
+  document.getElementById('rVerdict').textContent = d.verdict || '';
+  setGauge(d.overallScore || 0);
+
+  // Strengths
+  const sl = document.getElementById('strengthsList');
+  sl.innerHTML = (d.strengths || []).map(s =>
+    `<div class="card-item"><span class="card-arrow">▸</span><span class="card-text">${s}</span></div>`
+  ).join('');
+
+  // Risks
+  const rl = document.getElementById('risksList');
+  rl.innerHTML = (d.watchPoints || []).map(w =>
+    `<div class="card-item"><span class="card-arrow">▸</span><span class="card-text">${w}</span></div>`
+  ).join('');
+
+  // Criteria
+  const grid = document.getElementById('criteriaGrid');
+  grid.innerHTML = CRITERIA_DEFS.map(c => {
+    const crit = d.criteria?.[c.key] || { score: 0, comment: '' };
+    const col = scoreColor(crit.score);
+    return `<div class="criterion">
+      <div class="criterion-header">
+        <div class="criterion-left">
+          <span class="criterion-icon">${c.icon}</span>
+          <span class="criterion-label">${c.label}</span>
+        </div>
+        <span class="criterion-score" style="color:${col}">${crit.score}/100</span>
+      </div>
+      <div class="criterion-bar-bg">
+        <div class="criterion-bar" style="width:${crit.score}%;background:linear-gradient(90deg,${col}88,${col})"></div>
+      </div>
+      ${crit.comment ? `<div class="criterion-comment">${crit.comment}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // Quotes
+  document.getElementById('mungerQuote').textContent = `"${d.mungerQuote || ''}"`;
+  document.getElementById('buffettQuote').textContent = `"${d.buffettQuote || ''}"`;
+
+  show('results');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
